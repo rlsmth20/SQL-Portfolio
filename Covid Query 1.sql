@@ -55,11 +55,83 @@ AND location NOT IN ('High income','Upper middle income', 'Lower middle income',
 GROUP BY location
 ORDER BY total_death_count DESC;
 
----- AT 40:51 minutes in video
+-- Total cases, deaths, and death percentage worldwide
+SELECT SUM(new_cases) AS total_cases, SUM(CAST(new_deaths AS INT)) AS total_deaths,
+	SUM(CAST(new_deaths AS INT))/SUM(new_cases)*100 AS DeathPercentage
+FROM CovidProject..CovidDeaths
+WHERE continent IS NOT NULL
+ORDER BY total_cases, total_deaths
+
+-- Worldwide Vaccination rate
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+	SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location,
+	dea.date) AS  RollingVaccinations
+	--(RollingVaccinations/population)*100
+FROM CovidProject..CovidDeaths dea
+JOIN CovidProject..CovidVaccinations vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+AND new_vaccinations IS NOT NULL
+ORDER BY 2,3
 
 
+--CTE
+WITH PopVaccinated (continent, location, date, population, new_vaccinations, RollingVaccinations)
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+	SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location
+	,dea.date) AS  RollingVaccinations
+FROM CovidProject..CovidDeaths dea
+JOIN CovidProject..CovidVaccinations vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+AND new_vaccinations IS NOT NULL
+--ORDER BY 2,3
+)
+SELECT *, (RollingVaccinations/population)*100 AS PercentVaccinated
+FROM PopVaccinated
 
 
+--Temp Table 
+DROP TABLE IF EXISTS #PercentVaccinated
+CREATE TABLE #PercentVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+RollingVaccinations numeric,
+)
 
+INSERT INTO #PercentVaccinated
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+	SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location
+	,dea.date) AS  RollingVaccinations
+FROM CovidProject..CovidDeaths dea
+JOIN CovidProject..CovidVaccinations vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+AND new_vaccinations IS NOT NULL
 
+SELECT *, (RollingVaccinations/population)*100 AS PercentVaccinated
+FROM #PercentVaccinated
+ORDER BY location, date
 
+--View
+USE CovidProject
+GO
+CREATE VIEW PercentVaccinated AS
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+	SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location
+	,dea.date) AS  RollingVaccinations
+FROM CovidProject..CovidDeaths dea
+JOIN CovidProject..CovidVaccinations vac
+	ON dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+AND new_vaccinations IS NOT NULL
