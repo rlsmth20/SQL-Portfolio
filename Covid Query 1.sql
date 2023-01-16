@@ -33,6 +33,12 @@ WHERE continent IS NOT NULL
 GROUP BY population, location
 ORDER BY population_infection_rate DESC;
 
+SELECT location, population,date, MAX(total_cases) AS total_cases_count, ROUND(MAX((total_cases/population))*100,2) AS population_infection_rate
+FROM CovidProject..CovidDeaths
+WHERE continent IS NOT NULL
+GROUP BY location, population, date
+ORDER BY population_infection_rate DESC;
+
 -- Showing countries with highest death rate compared to population
 SELECT location, population, MAX(CAST(total_deaths AS INT)) AS total_death_count, ROUND(MAX((total_deaths/population))*100,2) AS population_death_rate
 FROM CovidProject..CovidDeaths
