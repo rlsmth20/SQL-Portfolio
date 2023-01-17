@@ -46,8 +46,84 @@ JOIN sales.salesorderdetail SOD
     ON SOH.salesorderID = SOD.salesorderID
 JOIN sales.vPersonDemographics D
     ON SOH.CustomerID = d.BusinessEntityID
-GROUP BY 
-    age_range, D.MaritalStatus, D.Gender
+GROUP BY age_range, D.MaritalStatus, D.Gender
 ORDER BY Sales desc
 
+--
+SELECT *
+FROM AdventureWorks2019.Sales.SalesPersonQuotaHistory
 
+--Employee Sales Performance
+SELECT 
+	S.BusinessEntityID, 
+	E.JobTitle, 
+	S.SalesQuota, 
+	S.SalesYTD, 
+	(S.SalesYTD/S.SalesQuota)*100 AS PercentQuota
+FROM Sales.Salesperson S
+JOIN HumanResources.Employee E
+	ON S.BusinessEntityID = E.BusinessEntityID
+GROUP BY S.BusinessEntityID, E.JobTitle, S.SalesQuota, s.SalesYTD
+ORDER BY PercentQuota DESC
+
+--Vendor Performance Analysis
+SELECT 
+	POH.VendorID, 
+	V.Name,
+	V.CreditRating,
+    AVG(DATEDIFF(day, POH.OrderDate, POH.ShipDate)) AS AvgLeadTime, 
+	(SUM(POD.RejectedQty)/SUM(POD.ReceivedQty))*100 AS AvgRejectionRate
+FROM Purchasing.PurchaseOrderHeader POH
+JOIN Purchasing.Vendor V 
+	ON POH.VendorID = V.BusinessEntityID
+JOIN Purchasing.PurchaseOrderDetail POD 
+	ON POH.PurchaseOrderID = POD.PurchaseOrderID
+GROUP BY POH.VendorID, V.Name, v.CreditRating
+ORDER BY AvgRejectionRate DESC, AvgLeadTime DESC
+
+--Average cost per product by vendor
+SELECT
+	PV.BusinessEntityID,
+	PV.ProductID,
+	AVG(PV.StandardPrice) AS AvgCostPerProduct
+FROM Purchasing.ProductVendor PV
+GROUP BY pv.ProductID, pv.BusinessEntityID
+ORDER BY pv.productID, AvgCostPerProduct
+
+
+
+WITH sales_data (ProductName, OrderYear, QuantitySold)
+AS (
+SELECT 
+    pro.Name as ProductName,
+    DATEPART(YEAR, soh.OrderDate) as OrderYear, 
+    SUM(sod.OrderQty) as QuantitySold
+FROM Sales.SalesOrderDetail as sod
+JOIN Production.Product as pro 
+	ON sod.ProductID = pro.ProductID
+JOIN Sales.SalesOrderHeader as soh
+	ON sod.SalesOrderID = soh.SalesOrderID
+WHERE DATEPART(YEAR, soh.OrderDate) = 2012
+)
+SELECT 
+    ProductName,
+    QuantitySold as '2012 Sales'
+FROM sales_data
+GROUP BY ProductName, OrderYear
+ORDER BY ProductName
+
+
+
+
+SELECT 
+    pro.Name,
+    DATEPART(YEAR, soh.OrderDate) as OrderYear, 
+    SUM(sod.OrderQty) as QuantitySold
+FROM Sales.SalesOrderDetail as sod
+JOIN Production.Product as pro 
+	ON sod.ProductID = pro.ProductID
+JOIN Sales.SalesOrderHeader as soh
+	ON sod.SalesOrderID = soh.SalesOrderID
+WHERE DATEPART(YEAR, soh.OrderDate) = 2012
+GROUP BY pro.Name, soh.OrderDate
+ORDER BY pro.Name
