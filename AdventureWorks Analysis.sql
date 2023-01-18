@@ -91,31 +91,8 @@ GROUP BY pv.ProductID, pv.BusinessEntityID
 ORDER BY pv.productID, AvgCostPerProduct
 
 
-
-WITH sales_data (ProductName, OrderYear, QuantitySold)
-AS (
-SELECT 
-    pro.Name as ProductName,
-    DATEPART(YEAR, soh.OrderDate) as OrderYear, 
-    SUM(sod.OrderQty) as QuantitySold
-FROM Sales.SalesOrderDetail as sod
-JOIN Production.Product as pro 
-	ON sod.ProductID = pro.ProductID
-JOIN Sales.SalesOrderHeader as soh
-	ON sod.SalesOrderID = soh.SalesOrderID
-WHERE DATEPART(YEAR, soh.OrderDate) = 2012
-)
-SELECT 
-    ProductName,
-    QuantitySold as '2012 Sales'
-FROM sales_data
-GROUP BY ProductName, OrderYear
-ORDER BY ProductName
-
-
-
-
-SELECT 
+--Sales Per Item By Year
+SELECT
     pro.Name,
     DATEPART(YEAR, soh.OrderDate) as OrderYear, 
     SUM(sod.OrderQty) as QuantitySold
@@ -124,6 +101,21 @@ JOIN Production.Product as pro
 	ON sod.ProductID = pro.ProductID
 JOIN Sales.SalesOrderHeader as soh
 	ON sod.SalesOrderID = soh.SalesOrderID
-WHERE DATEPART(YEAR, soh.OrderDate) = 2012
-GROUP BY pro.Name, soh.OrderDate
+WHERE DATEPART(YEAR, soh.OrderDate) IN ('2011', '2012', '2013', '2014')
+GROUP BY pro.Name, DATEPART(YEAR, soh.OrderDate)
 ORDER BY pro.Name
+
+
+--Sales Per Item By Month
+SELECT 
+    MONTH(soh.OrderDate) AS Month, 
+	DATEPART(YEAR, soh.OrderDate) AS Year,
+    p.Name AS Product_Name, 
+    SUM(sod.OrderQty) AS Quantity_Sold
+FROM Sales.SalesOrderHeader soh
+JOIN Sales.SalesOrderDetail sod 
+	ON soh.SalesOrderID = sod.SalesOrderID
+JOIN Production.Product p 
+	ON sod.ProductID = p.ProductID
+GROUP BY MONTH(soh.OrderDate), p.Name, DATEPART(YEAR, soh.OrderDate)
+ORDER BY DATEPART(YEAR,soh.OrderDate) , MONTH (soh.OrderDate) 
