@@ -3,11 +3,10 @@ SELECT *
 FROM CovidProject..CovidDeaths
 ORDER BY 3,4;
 
--- Select *
--- From CovidProject..CovidVaccinations
--- Order By 3,4
+Select *
+From CovidProject..CovidVaccinations
+Order By 3,4
 
--- Select Data that we are going to be using
 SELECT location, date, total_cases, new_cases, total_deaths, population
 FROM CovidProject..CovidDeaths
 ORDER BY location, date;
@@ -33,7 +32,7 @@ WHERE continent IS NOT NULL
 GROUP BY population, location
 ORDER BY population_infection_rate DESC;
 
-SELECT location, population,date, MAX(total_cases) AS total_cases_count, ROUND(MAX((total_cases/population))*100,2) AS population_infection_rate
+SELECT location, population, date, MAX(total_cases) AS total_cases_count, ROUND(MAX((total_cases/population))*100,2) AS population_infection_rate
 FROM CovidProject..CovidDeaths
 WHERE continent IS NOT NULL
 GROUP BY location, population, date
@@ -82,7 +81,7 @@ AND new_vaccinations IS NOT NULL
 ORDER BY 2,3
 
 
---CTE
+--Rolling vaccination rate and percent vaccinated
 WITH PopVaccinated (continent, location, date, population, new_vaccinations, RollingVaccinations)
 AS
 (
@@ -101,7 +100,7 @@ SELECT *, (RollingVaccinations/population)*100 AS PercentVaccinated
 FROM PopVaccinated
 
 
---Temp Table 
+--Creating table showing rolling vaccinations and vaccination rate 
 DROP TABLE IF EXISTS #PercentVaccinated
 CREATE TABLE #PercentVaccinated
 (
@@ -112,7 +111,7 @@ Population numeric,
 New_vaccinations numeric,
 RollingVaccinations numeric,
 )
-
+--Inserting data into above table
 INSERT INTO #PercentVaccinated
 SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
 	SUM(CAST(vac.new_vaccinations AS BIGINT)) OVER (PARTITION BY dea.location ORDER BY dea.location
@@ -128,7 +127,7 @@ SELECT *, (RollingVaccinations/population)*100 AS PercentVaccinated
 FROM #PercentVaccinated
 ORDER BY location, date
 
---View
+--View with rolling vaccinations and vaccination rate
 USE CovidProject
 GO
 CREATE VIEW PercentVaccinated AS

@@ -2,41 +2,57 @@ USE AdventureWorks2019
 GO
 
 --Top 10 sellers by country
-SELECT TOP 10 
-	PS.Name, 
-	st.Name, 
+SELECT TOP 10
+	PSub.Name AS Product, 
+	st.Name AS Country, 
 	SUM(SOD.OrderQty) AS salesquanitity
 FROM sales.SalesOrderDetail SOD
-JOIN Production.Product P
-	ON SOD.ProductID = P.ProductID
-JOIN Production.ProductSubcategory PS
-	ON P.ProductSubcategoryID = PS.ProductSubcategoryID
+JOIN Production.Product Prod
+	ON SOD.ProductID = Prod.ProductID
+JOIN Production.ProductSubcategory PSub
+	ON Prod.ProductSubcategoryID = PSub.ProductSubcategoryID
 JOIN sales.SalesOrderHeader SOH
 	ON SOH.SalesOrderID = sod.SalesOrderID
 JOIN sales.SalesTerritory ST
 	ON ST.TerritoryID = SOH.TerritoryID
 WHERE st.name NOT IN  ('central', 'southeast', 'southwest', 'northeast', 'northwest')
-GROUP BY PS.Name, ST.Name
+GROUP BY PSub.Name, ST.Name
+ORDER BY salesquanitity DESC
+
+--Top 10 selling products
+SELECT TOP 10
+	PSub.Name AS Product, 
+	SUM(SOD.OrderQty) AS salesquanitity
+FROM sales.SalesOrderDetail SOD
+JOIN Production.Product Prod
+	ON SOD.ProductID = Prod.ProductID
+JOIN Production.ProductSubcategory PSub
+	ON Prod.ProductSubcategoryID = PSub.ProductSubcategoryID
+JOIN sales.SalesOrderHeader SOH
+	ON SOH.SalesOrderID = sod.SalesOrderID
+JOIN sales.SalesTerritory ST
+	ON ST.TerritoryID = SOH.TerritoryID
+GROUP BY PSub.Name
 ORDER BY salesquanitity DESC
 
 
 --Sales by demographics
 WITH cte AS (
     SELECT 
-        D.BusinessEntityID,
+        Demo.BusinessEntityID,
         CASE 
-            WHEN DateDIFF(year,d.BirthDate,GETDATE()) BETWEEN 40 AND 50 THEN '40-50'
-			WHEN DateDIFF(year,d.BirthDate,GETDATE()) BETWEEN 51 AND 60 THEN '51-60'
-			WHEN DateDIFF(year,d.BirthDate,GETDATE()) BETWEEN 61 AND 70 THEN '61-70'
+            WHEN DateDIFF(year,Demo.BirthDate,GETDATE()) BETWEEN 40 AND 50 THEN '40-50'
+			WHEN DateDIFF(year,Demo.BirthDate,GETDATE()) BETWEEN 51 AND 60 THEN '51-60'
+			WHEN DateDIFF(year,Demo.BirthDate,GETDATE()) BETWEEN 61 AND 70 THEN '61-70'
             ELSE '71+'
         END AS age_range
     FROM 
-        sales.vPersonDemographics D
+        sales.vPersonDemographics Demo
 )
 SELECT 
     age_range,
-    D.MaritalStatus,
-    D.Gender,
+    Demo.MaritalStatus,
+    Demo.Gender,
     SUM(SOD.linetotal) Sales
 FROM 
     cte
@@ -44,9 +60,9 @@ JOIN sales.SalesOrderHeader SOH
     ON cte.BusinessEntityID = SOH.CustomerID
 JOIN sales.salesorderdetail SOD
     ON SOH.salesorderID = SOD.salesorderID
-JOIN sales.vPersonDemographics D
-    ON SOH.CustomerID = d.BusinessEntityID
-GROUP BY age_range, D.MaritalStatus, D.Gender
+JOIN sales.vPersonDemographics Demo
+    ON SOH.CustomerID = Demo.BusinessEntityID
+GROUP BY age_range, Demo.MaritalStatus, Demo.Gender
 ORDER BY Sales desc
 
 --
@@ -54,68 +70,93 @@ SELECT *
 FROM AdventureWorks2019.Sales.SalesPersonQuotaHistory
 
 --Employee Sales Performance
+USE AdventureWorks2019
+GO
 SELECT 
-	S.BusinessEntityID, 
+	SPers.BusinessEntityID, 
 	E.JobTitle, 
-	S.SalesQuota, 
-	S.SalesYTD, 
-	(S.SalesYTD/S.SalesQuota)*100 AS PercentQuota
-FROM Sales.Salesperson S
+	SPers.SalesQuota, 
+	SPers.SalesYTD, 
+	(SPers.SalesYTD/SPers.SalesQuota)*100 AS PercentQuota
+FROM Sales.SalesPerson Spers
 JOIN HumanResources.Employee E
-	ON S.BusinessEntityID = E.BusinessEntityID
-GROUP BY S.BusinessEntityID, E.JobTitle, S.SalesQuota, s.SalesYTD
+	ON SPers.BusinessEntityID = E.BusinessEntityID
+GROUP BY SPers.BusinessEntityID, E.JobTitle, SPers.SalesQuota, Spers.SalesYTD
 ORDER BY PercentQuota DESC
+
+USE AdventureWorks2019
+GO
+CREATE VIEW EmployeeSalesPerformance AS
+SELECT 
+	SPers.BusinessEntityID, 
+	Emp.JobTitle, 
+	SPers.SalesQuota, 
+	SPers.SalesYTD, 
+	(SPers.SalesYTD/SPers.SalesQuota)*100 AS PercentQuota
+FROM Sales.Salesperson SPers
+JOIN HumanResources.Employee Emp
+	ON SPers.BusinessEntityID = Emp.BusinessEntityID
+GROUP BY SPers.BusinessEntityID, Emp.JobTitle, SPers.SalesQuota, SPers.SalesYTD
+--ORDER BY PercentQuota DESC
 
 --Vendor Performance Analysis
 SELECT 
 	POH.VendorID, 
-	V.Name,
-	V.CreditRating,
+	Vend.Name,
+	Vend.CreditRating,
     AVG(DATEDIFF(day, POH.OrderDate, POH.ShipDate)) AS AvgLeadTime, 
-	(SUM(POD.RejectedQty)/SUM(POD.ReceivedQty))*100 AS AvgRejectionRate
+	SUM(POD.RejectedQty)/SUM(POD.ReceivedQty)*100 AS AvgRejectionRate
 FROM Purchasing.PurchaseOrderHeader POH
-JOIN Purchasing.Vendor V 
-	ON POH.VendorID = V.BusinessEntityID
+JOIN Purchasing.Vendor Vend
+	ON POH.VendorID = Vend.BusinessEntityID
 JOIN Purchasing.PurchaseOrderDetail POD 
 	ON POH.PurchaseOrderID = POD.PurchaseOrderID
-GROUP BY POH.VendorID, V.Name, v.CreditRating
+GROUP BY POH.VendorID, Vend.Name, Vend.CreditRating
 ORDER BY AvgRejectionRate DESC, AvgLeadTime DESC
 
 --Average cost per product by vendor
 SELECT
-	PV.BusinessEntityID,
-	PV.ProductID,
-	AVG(PV.StandardPrice) AS AvgCostPerProduct
-FROM Purchasing.ProductVendor PV
-GROUP BY pv.ProductID, pv.BusinessEntityID
-ORDER BY pv.productID, AvgCostPerProduct
+	ProVend.BusinessEntityID,
+	ProVend.ProductID,
+	AVG(ProVend.StandardPrice) AS AvgCostPerProduct
+FROM Purchasing.ProductVendor ProVend
+GROUP BY ProVend.ProductID, ProVend.BusinessEntityID
+ORDER BY ProVend.productID, AvgCostPerProduct
 
 
 --Sales Per Item By Year
 SELECT
-    pro.Name,
+    Pro.Name,
     DATEPART(YEAR, soh.OrderDate) as OrderYear, 
     SUM(sod.OrderQty) as QuantitySold
-FROM Sales.SalesOrderDetail as sod
-JOIN Production.Product as pro 
-	ON sod.ProductID = pro.ProductID
-JOIN Sales.SalesOrderHeader as soh
-	ON sod.SalesOrderID = soh.SalesOrderID
-WHERE DATEPART(YEAR, soh.OrderDate) IN ('2011', '2012', '2013', '2014')
-GROUP BY pro.Name, DATEPART(YEAR, soh.OrderDate)
-ORDER BY pro.Name
+FROM Sales.SalesOrderDetail as SOD
+JOIN Production.Product as Pro 
+	ON SOD.ProductID = pro.ProductID
+JOIN Sales.SalesOrderHeader as SOH
+	ON SOD.SalesOrderID = soh.SalesOrderID
+WHERE DATEPART(YEAR, SOH.OrderDate) IN ('2011', '2012', '2013', '2014')
+GROUP BY Pro.Name, DATEPART(YEAR, SOH.OrderDate)
+ORDER BY OrderYear, QuantitySold DESC, Pro.Name
 
 
 --Sales Per Item By Month
-SELECT 
-    MONTH(soh.OrderDate) AS Month, 
-	DATEPART(YEAR, soh.OrderDate) AS Year,
-    p.Name AS Product_Name, 
-    SUM(sod.OrderQty) AS Quantity_Sold
-FROM Sales.SalesOrderHeader soh
-JOIN Sales.SalesOrderDetail sod 
-	ON soh.SalesOrderID = sod.SalesOrderID
-JOIN Production.Product p 
-	ON sod.ProductID = p.ProductID
-GROUP BY MONTH(soh.OrderDate), p.Name, DATEPART(YEAR, soh.OrderDate)
-ORDER BY DATEPART(YEAR,soh.OrderDate) , MONTH (soh.OrderDate) 
+SELECT
+    MONTH(SOH.OrderDate) AS Month, 
+	DATEPART(YEAR, SOH.OrderDate) AS Year,
+    Pro.Name AS Product_Name, 
+    SUM(SOD.OrderQty) AS Quantity_Sold
+FROM Sales.SalesOrderHeader SOH
+JOIN Sales.SalesOrderDetail SOD 
+	ON SOH.SalesOrderID = SOD.SalesOrderID
+JOIN Production.Product Pro
+	ON SOD.ProductID = Pro.ProductID
+GROUP BY MONTH(SOH.OrderDate), Pro.Name, DATEPART(YEAR, SOH.OrderDate)
+ORDER BY DATEPART(YEAR,SOH.OrderDate) , MONTH (SOH.OrderDate)
+
+--Sales per month
+SELECT DATEPART(YEAR, OrderDate) AS Year
+	 , DATEPART(MONTH, OrderDate) AS Month
+	 , SUM(TotalDue) AS [Total Sales]
+FROM Sales.SalesOrderHeader SOH
+GROUP BY DATEPART(YEAR, OrderDate), DATEPART(MONTH, OrderDate)
+ORDER BY Year, Month
